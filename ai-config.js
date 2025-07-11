@@ -1,34 +1,221 @@
 // Centralized AI Configuration
 // This file contains all AI parameters and settings used across the application
 
-// Approved topics/keywords for AI questions
-export const APPROVED_TOPICS = [
-    'injury', 'cancer', 'lawsuit', 'settlement', 'symptom', 'legal', 'medical', 'asbestos', 'mesothelioma',
-    'talcum', 'powder', 'silicosis', 'lung', 'disease', 'workers', 'rights', 'roundup', 'bayer', 'trust',
-    'compensation', 'hearing', 'loss', 'claim', 'attorney', 'lawyer', 'case', 'exposure', 'diagnosis',
-    'treatment', 'manufacturer', 'court', 'verdict', 'payout', 'compensate', 'compensated', 'settle',
-    'symptoms', 'causes', 'prevention', 'resources', 'options', 'benefits', 'fund', 'medical'
+// Connected data sources for reference (used in system messages)
+export const CONNECTED_DATA_SOURCES = [
+    'legal cases', 'settlements', 'law firms', 'medical conditions', 'injury types',
+    'asbestos', 'mesothelioma', 'mass tort', 'class action', 'personal injury',
+    'compensation', 'litigation', 'symptoms', 'diagnosis', 'treatment options',
+    'legal rights', 'claim process', 'attorney consultation', 'medical records',
+    'expert testimony', 'court procedures', 'settlement negotiation'
 ];
 
-export const NOT_AUTHORIZED_MESSAGE = "I'm sorry, I'm not authorized to answer questions outside of approved legal and medical topics related to injury information.";
+// Dynamic LIA Active Cases (loaded from Google Sheets via server API)
+let DYNAMIC_LIA_CASES = null;
 
-export function isApprovedTopic(question) {
-    const lower = question.toLowerCase();
-    return APPROVED_TOPICS.some(keyword => lower.includes(keyword));
+// Fetch LIA active cases from server
+async function fetchLIAActiveCases() {
+    try {
+        const response = await fetch(`${AI_CONFIG.api.baseURL}/api/lia/active-cases`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        DYNAMIC_LIA_CASES = data;
+        
+        console.log(`📊 Loaded ${data.totalActive} active LIA cases from ${data.source}`);
+        return data;
+    } catch (error) {
+        console.error('❌ Failed to fetch LIA active cases:', error);
+        DYNAMIC_LIA_CASES = getFallbackLIACases();
+        return DYNAMIC_LIA_CASES;
+    }
 }
+
+// Get fallback LIA cases if server is unavailable
+function getFallbackLIACases() {
+    return {
+        activeCases: [
+            {
+                caseType: 'mesothelioma',
+                name: 'Mesothelioma',
+                description: 'Mesothelioma and asbestos exposure cases',
+                keywords: ['mesothelioma', 'asbestos', 'asbestos exposure'],
+                active: true,
+                source: 'fallback'
+            }
+        ],
+        allCases: [
+            {
+                caseType: 'mesothelioma',
+                name: 'Mesothelioma',
+                description: 'Mesothelioma and asbestos exposure cases',
+                keywords: ['mesothelioma', 'asbestos', 'asbestos exposure'],
+                active: true,
+                source: 'fallback'
+            }
+        ],
+        totalActive: 1,
+        totalCases: 1,
+        source: 'fallback'
+    };
+}
+
+// Note: Removed restrictive topic checking - AI now provides guidance for all topics
+
+// Check if question relates to LIA active cases (now dynamic)
+export async function isLIAActiveCase(question) {
+    // Ensure we have the latest LIA cases data
+    if (!DYNAMIC_LIA_CASES) {
+        await fetchLIAActiveCases();
+    }
+    
+    const lower = question.toLowerCase();
+    
+    for (const caseInfo of DYNAMIC_LIA_CASES.activeCases) {
+        if (caseInfo.keywords.some(keyword => lower.includes(keyword.toLowerCase()))) {
+            return {
+                isActive: true,
+                caseType: caseInfo.caseType,
+                name: caseInfo.name,
+                description: caseInfo.description,
+                keywords: caseInfo.keywords,
+                lastUpdated: caseInfo.lastUpdated
+            };
+        }
+    }
+    
+    return { isActive: false };
+}
+
+// Get active LIA cases (updated to use dynamic data)
+export async function getActiveLIACases() {
+    if (!DYNAMIC_LIA_CASES) {
+        await fetchLIAActiveCases();
+    }
+    
+    return DYNAMIC_LIA_CASES.activeCases || [];
+}
+
+// Get all LIA cases (updated to use dynamic data)
+export async function getAllLIACases() {
+    if (!DYNAMIC_LIA_CASES) {
+        await fetchLIAActiveCases();
+    }
+    
+    return DYNAMIC_LIA_CASES;
+}
+
+// Refresh LIA cases from server
+export async function refreshLIAActiveCases() {
+    console.log('🔄 Refreshing LIA active cases...');
+    return await fetchLIAActiveCases();
+}
+
+// Note: Removed restrictive messaging - AI now provides helpful guidance for all topics
 
 // Banned topics/keywords for post-checking AI output
 export const BANNED_TOPICS = [
     'epstein', 'sex trafficking', 'politics', 'celebrity', 'conspiracy', 'terrorism', 'violence', 'murder',
-    'suicide', 'abuse', 'drugs', 'gambling', 'weapons', 'extremism', 'porn', 'adult', 'crypto', 'bitcoin',
-    'stock', 'finance', 'celebrity', 'entertainment', 'music', 'movie', 'tv', 'sports', 'dating', 'relationship',
+    'suicide', 'drugs', 'gambling', 'weapons', 'extremism', 'porn', 'adult', 'crypto', 'bitcoin',
+    'stock', 'finance', 'entertainment', 'music', 'movie', 'tv', 'sports', 'dating', 'relationship',
     'religion', 'spiritual', 'astrology', 'horoscope', 'alien', 'ufo', 'paranormal', 'lottery', 'casino', 'scam',
-    'fraud', 'hacking', 'malware', 'phishing', 'dark web', 'black market', 'escort', 'escort service', 'escort agency'
+    'fraud', 'hacking', 'malware', 'phishing', 'dark web', 'black market', 'escort'
 ];
 
 export function isBannedTopic(response) {
     const lower = response.toLowerCase();
     return BANNED_TOPICS.some(word => lower.includes(word));
+}
+
+// Article URL mappings for proper linking
+export const ARTICLE_MAPPINGS = {
+    'mesothelioma symptoms': '/mesothelioma.html',
+    'mesothelioma diagnosis': '/mesothelioma.html',
+    'mesothelioma signs': '/mesothelioma.html',
+    'mesothelioma warning signs': '/mesothelioma.html',
+    'mesothelioma early signs': '/mesothelioma.html',
+    'mesothelioma': '/mesothelioma.html',
+    'asbestos exposure': '/mesothelioma.html',
+    'asbestos exposure risks': '/mesothelioma.html',
+    'asbestos related diseases': '/mesothelioma.html',
+    'asbestos': '/mesothelioma.html',
+    'legal options': '/legal-options.html',
+    'legal advice': '/legal-options.html',
+    'injury diagnosis': '/legal-options.html',
+    'compensation options': '/compensation.html',
+    'settlement options': '/compensation.html',
+    'compensation': '/compensation.html',
+    'settlement': '/compensation.html',
+    'caregiver support': '/caregivers.html',
+    'caring for someone': '/caregivers.html',
+    'medical costs': '/cost-of-care.html',
+    'cost of treatment': '/cost-of-care.html',
+    'treatment costs': '/cost-of-care.html',
+    'financial support': '/cost-of-care.html',
+    'ovarian cancer': '/ovarian-cancer.html',
+    'lymphoma': '/lymphoma.html',
+    'mass tort': '/mass-tort.html',
+    'class action': '/class-action.html'
+};
+
+// Helper function to find and replace article references with links
+export function addArticleLinksToResponse(response) {
+    let processedResponse = response;
+    
+    // Handle various article reference patterns with flexible matching
+    const patterns = [
+        /For more (?:detailed )?information (?:about|on) ([^,.\n]+)/gi,
+        /You can (?:also )?(?:read|learn) (?:more )?about ([^,.\n]+)/gi,
+        /(?:Learn|Read) more about ([^,.\n]+)/gi,
+        /More information (?:about|on) ([^,.\n]+)/gi
+    ];
+    
+    patterns.forEach(pattern => {
+        processedResponse = processedResponse.replace(pattern, (match, articleTopic) => {
+            const topic = articleTopic.toLowerCase().trim();
+            
+            // Find the best matching article URL
+            for (const [key, url] of Object.entries(ARTICLE_MAPPINGS)) {
+                if (topic.includes(key.toLowerCase()) || key.toLowerCase().includes(topic)) {
+                    const properLink = `<a href="${url}" target="_blank">${articleTopic.trim()}</a>`;
+                    return match.replace(articleTopic, properLink);
+                }
+            }
+            return match; // Return original if no match found
+        });
+    });
+    
+    // Clean up any malformed HTML that might have been created
+    processedResponse = processedResponse.replace(/([^"]\w+\.html)"?\s*target="?blank"?>/gi, '');
+    
+    // Handle standalone topic mentions (but be more careful to avoid over-matching)
+    const topicPatterns = [
+        'mesothelioma symptoms and diagnosis',
+        'mesothelioma symptoms',
+        'mesothelioma diagnosis',
+        'asbestos exposure risks',
+        'asbestos exposure',
+        'legal options',
+        'compensation options',
+        'medical costs',
+        'ovarian cancer',
+        'lymphoma',
+        'mass tort',
+        'class action'
+    ];
+    
+    topicPatterns.forEach(topic => {
+        // Only replace if it's not already part of a link
+        const regex = new RegExp(`(?<!<a[^>]*>)\\b${topic.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b(?![^<]*</a>)`, 'gi');
+        const url = ARTICLE_MAPPINGS[topic.toLowerCase()];
+        if (url) {
+            processedResponse = processedResponse.replace(regex, `<a href="${url}" target="_blank">${topic}</a>`);
+        }
+    });
+    
+    return processedResponse;
 }
 
 export const AI_CONFIG = {
@@ -37,26 +224,40 @@ export const AI_CONFIG = {
         model: 'gpt-4o-mini',
         temperature: 0.7,
         max_tokens: 500,
-        baseURL: window.location.origin
+        baseURL: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
     },
+
+    // Configuration status (will be populated from server)
+    configStatus: null,
 
     // System Messages
     systemMessages: {
         // General injury and legal information assistant
-        general: `You are an AI assistant specializing in injury and legal information. You are ONLY authorized to answer questions about the following topics: injury, cancer, lawsuit, settlement, symptom, legal, medical, asbestos, mesothelioma, talcum, powder, silicosis, lung, disease, workers, rights, roundup, bayer, trust, compensation, hearing, loss, claim, attorney, lawyer, case, exposure, diagnosis, treatment, manufacturer, court, verdict, payout, compensate, compensated, settle, symptoms, causes, prevention, resources, options, benefits, fund, medical. If the user asks about anything else, you MUST respond ONLY with: "I'm sorry, I'm not authorized to answer questions outside of approved legal and medical topics related to injury information." Do not provide any other information or attempt to answer. 
+        general: `You are an AI assistant specializing in injury and legal information. You have access to comprehensive databases containing:
 
-Please provide helpful, accurate information about injury cases, legal rights, medical conditions, settlements, and related topics. Be empathetic and informative, but always recommend consulting with qualified medical professionals or attorneys for specific situations. Keep your response concise (1-2 paragraphs or a short list).
+- Legal case information and settlements from Google Sheets
+- Law firm directories with specialties and success rates
+- Medical condition details and symptoms
+- Injury types and their legal implications
+- Compensation and settlement data
+- Legal procedures and rights information
+- Active legal cases and referral opportunities
 
-IMPORTANT: When relevant to the user's query, reference helpful articles from our site by mentioning topics like:
-- "The Early Warning Signs and Symptoms of Mesothelioma" for mesothelioma symptoms and diagnosis questions
-- "How to Get Diagnosed with Mesothelioma" for diagnostic process questions
-- "Understanding Asbestos Exposure Risks" for exposure-related questions
-- "Legal Options After an Injury Diagnosis" for legal advice questions  
-- "Understanding Compensation and Settlement Options" for settlement/compensation questions
-- "Caring for Someone with a Serious Injury" for caregiver support questions
-- "The Cost of Treatment and Financial Support" for medical cost questions
+You excel at providing helpful information about:
+- Mass tort and class action cases (mesothelioma, talcum powder, Roundup, etc.)
+- Personal injury litigation and legal rights
+- Medical conditions related to injuries
+- Legal claim processes and compensation
+- Settlement information and case outcomes
+- Law firm recommendations based on specialty
+- Medical symptoms and diagnosis information
+- Legal procedures and court processes
 
-Format article references as: "For more detailed information, see our article on [Article Topic]."`,
+When users ask about topics outside your specialty, acknowledge their question and then guide them toward related legal or medical injury topics you can help with. For example, if someone asks about weather, you might say "I can't provide weather information, but I can help you understand how environmental factors like asbestos exposure can lead to serious health conditions like mesothelioma."
+
+Always be empathetic and informative, but recommend consulting with qualified medical professionals or attorneys for specific situations. Keep your responses concise (1-2 paragraphs or a short list).
+
+IMPORTANT: When relevant to the user's query, reference helpful articles from our site by mentioning specific topics naturally in your response.`,
 
         // Article-specific context
         articleContext: (articleTitle, articleContent) => `You are an AI assistant specializing in injury and legal information. The user is asking about: ${articleTitle}. 
@@ -64,23 +265,16 @@ Format article references as: "For more detailed information, see our article on
 Article Context:
 ${articleContent}
 
-Please provide helpful, accurate information based on this specific article. Be empathetic and informative, but always recommend consulting with qualified medical professionals or attorneys for specific situations.`,
+Please provide helpful, accurate information based on this specific article and your connected databases. Be empathetic and informative, but always recommend consulting with qualified medical professionals or attorneys for specific situations.`,
 
         // Legal referral trigger
-        legalReferral: `You are an AI assistant specializing in injury and legal information. Please provide helpful, accurate information about injury cases, legal rights, medical conditions, settlements, and related topics. Be empathetic and informative, but always recommend consulting with qualified medical professionals or attorneys for specific situations. Keep your response concise (1-2 paragraphs or a short list).
+        legalReferral: `You are an AI assistant specializing in injury and legal information with access to comprehensive legal and medical databases. Please provide helpful, accurate information about injury cases, legal rights, medical conditions, settlements, and related topics based on your connected data sources.
+
+Be empathetic and informative, but always recommend consulting with qualified medical professionals or attorneys for specific situations. Keep your response concise (1-2 paragraphs or a short list).
 
 IMPORTANT: If the user asks about legal options, filing claims, consulting attorneys, or seeking legal advice, mention that they can start their claim at legalinjuryadvocates.com.
 
-When relevant to the user's query, reference helpful articles from our site by mentioning topics like:
-- "The Early Warning Signs and Symptoms of Mesothelioma" for mesothelioma symptoms and diagnosis questions
-- "How to Get Diagnosed with Mesothelioma" for diagnostic process questions
-- "Understanding Asbestos Exposure Risks" for exposure-related questions
-- "Legal Options After an Injury Diagnosis" for legal advice questions  
-- "Understanding Compensation and Settlement Options" for settlement/compensation questions
-- "Caring for Someone with a Serious Injury" for caregiver support questions
-- "The Cost of Treatment and Financial Support" for medical cost questions
-
-Format article references as: "For more detailed information, see our article on [Article Topic]."` 
+When relevant to the user's query, reference helpful articles from our site by mentioning specific topics naturally in your response.` 
     },
 
     // Response Formatting
@@ -129,7 +323,14 @@ export function createApiRequest(message, systemMessage = null, options = {}) {
 }
 
 // Helper function to check if response should include legal referral
-export function shouldIncludeLegalReferral(text) {
+export async function shouldIncludeLegalReferral(text) {
+    // Check if the text relates to LIA active cases
+    const liaCheck = await isLIAActiveCase(text);
+    if (!liaCheck.isActive) {
+        return false;
+    }
+    
+    // Check if text contains legal-related keywords
     const lowerText = text.toLowerCase();
     return AI_CONFIG.formatting.legalReferralKeywords.some(keyword => 
         lowerText.includes(keyword.toLowerCase())
@@ -137,10 +338,13 @@ export function shouldIncludeLegalReferral(text) {
 }
 
 // Helper function to add legal referral to response
-export function addLegalReferralIfNeeded(text) {
-    if (shouldIncludeLegalReferral(text)) {
-        return text + AI_CONFIG.formatting.legalReferralMessage;
+export async function addLegalReferralIfNeeded(text) {
+    const liaCheck = await isLIAActiveCase(text);
+    
+    if (liaCheck.isActive && await shouldIncludeLegalReferral(text)) {
+        return text + `<br><br><strong>➡️ Legal Injury Advocates is currently handling ${liaCheck.description.toLowerCase()}. You can start your claim at <a href="https://legalinjuryadvocates.com" target="_blank">legalinjuryadvocates.com</a>.</strong>`;
     }
+    
     return text;
 }
 
@@ -196,4 +400,109 @@ export function markdownToHtml(md) {
     }
     
     return html;
+}
+
+// Helper function to fetch server configuration status
+export async function fetchConfigurationStatus() {
+    try {
+        const response = await fetch(`${AI_CONFIG.api.baseURL}/api/config/status`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const configStatus = await response.json();
+        AI_CONFIG.configStatus = configStatus;
+        
+        console.log('📊 Configuration Status:', configStatus);
+        return configStatus;
+    } catch (error) {
+        console.error('❌ Failed to fetch configuration status:', error);
+        return null;
+    }
+}
+
+// Helper function to check if all required configurations are available
+export function isConfigurationComplete() {
+    if (!AI_CONFIG.configStatus) {
+        return false;
+    }
+    
+    const { openai, google, hubspot, validation } = AI_CONFIG.configStatus;
+    return openai.configured && google.configured && hubspot.configured && validation.isValid;
+}
+
+// Helper function to get configuration warnings
+export function getConfigurationWarnings() {
+    if (!AI_CONFIG.configStatus) {
+        return ['Configuration status not loaded. Please check server connection.'];
+    }
+    
+    const warnings = [];
+    const { openai, google, hubspot, validation } = AI_CONFIG.configStatus;
+    
+    if (!openai.configured) {
+        warnings.push('OpenAI API key not configured');
+    }
+    
+    if (!google.configured) {
+        warnings.push('Google Sheets API not configured');
+    }
+    
+    if (!hubspot.configured) {
+        warnings.push('HubSpot API not configured');
+    }
+    
+    if (validation.errors && validation.errors.length > 0) {
+        warnings.push(...validation.errors);
+    }
+    
+    return warnings;
+}
+
+// Helper function to display configuration status in UI
+export function displayConfigurationStatus() {
+    const warnings = getConfigurationWarnings();
+    
+    if (warnings.length > 0) {
+        console.warn('⚠️  Configuration Issues:', warnings);
+        
+        // You can add UI notification logic here
+        // For example: show a warning banner or modal
+        return {
+            hasIssues: true,
+            warnings: warnings,
+            message: 'Some configuration issues detected. Please check server logs.'
+        };
+    }
+    
+    return {
+        hasIssues: false,
+        warnings: [],
+        message: 'All configurations are properly set up.'
+    };
+}
+
+// Initialize configuration check when module loads
+if (typeof window !== 'undefined') {
+    (async function initializeConfiguration() {
+        try {
+            await fetchConfigurationStatus();
+            const status = displayConfigurationStatus();
+            
+            if (status.hasIssues) {
+                console.warn('🔧 Configuration setup needed:', status.warnings);
+            } else {
+                console.log('✅ All configurations are properly set up');
+            }
+        } catch (error) {
+            console.error('Failed to initialize configuration:', error);
+        }
+    })();
+
+    // Load LIA cases when the module loads
+    fetchLIAActiveCases().then(() => {
+        console.log('✅ LIA active cases loaded from Google Sheets');
+    }).catch(error => {
+        console.warn('⚠️ Failed to load LIA active cases:', error);
+    });
 } 

@@ -4,7 +4,7 @@ import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { SERVER_AI_CONFIG, createOpenAIRequest, getServerErrorMessage } from './server-ai-config.js';
+import { SERVER_AI_CONFIG, createOpenAIRequest, getServerErrorMessage, validateConfiguration, getConfigurationStatus } from './server-ai-config.js';
 import { DataIntegrationService } from './data-integration-service.js';
 
 // Load environment variables
@@ -18,7 +18,7 @@ const port = process.env.PORT || 3000;
 
 // Initialize OpenAI
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: SERVER_AI_CONFIG.api.apiKey,
 });
 
 // Initialize Data Integration Service
@@ -203,6 +203,75 @@ app.get('/api/test', async (req, res) => {
   }
 });
 
+// API endpoint to get configuration status
+app.get('/api/config/status', (req, res) => {
+  try {
+    const status = getConfigurationStatus();
+    console.log('📊 Configuration status requested');
+    
+    // Don't expose sensitive information like API keys
+    const safeStatus = {
+      openai: {
+        configured: status.openai.configured,
+        model: status.openai.model
+      },
+      google: {
+        configured: status.google.configured,
+        spreadsheetId: status.google.spreadsheetId ? '***configured***' : null
+      },
+      hubspot: {
+        configured: status.hubspot.configured,
+        portalId: status.hubspot.portalId
+      },
+      validation: status.validation
+    };
+    
+    res.json(safeStatus);
+  } catch (error) {
+    console.error('❌ Error getting configuration status:', error);
+    res.status(500).json({ error: 'Failed to get configuration status' });
+  }
+});
+
+// API endpoint to get LIA active cases
+app.get('/api/lia/active-cases', async (req, res) => {
+  try {
+    console.log('📊 Fetching LIA active cases from Google Sheets...');
+    const liaData = await dataService.getLIAActiveCases();
+    
+    res.json({
+      ...liaData,
+      message: liaData.source === 'fallback' ? 'Using fallback data - Google Sheets not available' : 'Data loaded from Google Sheets'
+    });
+  } catch (error) {
+    console.error('❌ Error getting LIA active cases:', error);
+    res.status(500).json({ error: 'Failed to get LIA active cases' });
+  }
+});
+
+// API endpoint to check if a query relates to LIA active cases
+app.post('/api/lia/check-case', async (req, res) => {
+  try {
+    const { query } = req.body;
+    
+    if (!query) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+    
+    console.log(`🔍 Checking LIA active case for query: "${query}"`);
+    const result = await dataService.checkLIAActiveCase(query);
+    
+    res.json({
+      query,
+      ...result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Error in LIA case check:', error);
+    res.status(500).json({ error: 'Failed to check LIA case' });
+  }
+});
+
 // Serve the main HTML file
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -220,9 +289,35 @@ app.get('/health', (req, res) => {
 
 // Start server
 app.listen(port, () => {
-  console.log(`🚀 Server running at http://localhost:${port}`);
-  console.log(`🤖 OpenAI API Key: ${process.env.OPENAI_API_KEY ? 'Configured' : 'Missing'}`);
-  console.log(`📝 Visit http://localhost:${port} to use the injury info site`);
+  console.log(`🚀 Server running on port ${port}`);
+  console.log(`📁 Serving files from: ${__dirname}`);
+  
+  // Configuration status check
+  const configStatus = getConfigurationStatus();
+  console.log('🔧 Configuration Status:');
+  console.log(`   OpenAI: ${configStatus.openai.configured ? '✅ Configured' : '❌ Missing'}`);
+  console.log(`   Google Sheets: ${configStatus.google.configured ? '✅ Configured' : '❌ Missing'}`);
+  console.log(`   HubSpot: ${configStatus.hubspot.configured ? '✅ Configured' : '❌ Missing'}`);
+  
+  if (!configStatus.validation.isValid) {
+    console.log('⚠️  Configuration Issues:');
+    configStatus.validation.errors.forEach(error => {
+      console.log(`   - ${error}`);
+    });
+  }
+  
+  console.log('📊 Available endpoints:');
+  console.log('   GET  /api/config/status - Configuration status');
+  console.log('   POST /api/chat - OpenAI chat');
+  console.log('   GET  /api/articles - Get all articles');
+  console.log('   GET  /api/articles/:slug - Get specific article');
+  console.log('   GET  /api/law-firms - Search law firms');
+  console.log('   GET  /api/settlements - Get settlement data');
+  console.log('   GET  /api/search/:condition - Search condition info');
+  console.log('   POST /api/cache/clear - Clear cache');
+  console.log('   GET  /api/test - Test OpenAI connection');
+  console.log('   GET  /api/lia/active-cases - Get LIA active cases');
+  console.log('   POST /api/lia/check-case - Check if a query relates to LIA active cases');
 });
 
 export default app; 

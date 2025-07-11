@@ -825,6 +825,8 @@ IMPORTANT: If the user asks about legal options, filing claims, consulting attor
                 
                 // Add legal referral if needed
                 let aiText = addLegalReferralIfNeeded(data.response);
+                // Add article links to response
+                aiText = addArticleLinksToResponse(aiText);
                 
                 conversationHistory.push({ role: 'assistant', content: aiText });
                 renderConversation();
@@ -896,6 +898,91 @@ IMPORTANT: If the user asks about legal options, filing claims, consulting attor
             return text.replace(/[&<>\"]+/g, function(c) {
                 return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c];
             });
+        }
+
+        // Article URL mappings for proper linking
+        const ARTICLE_MAPPINGS = {
+            'mesothelioma symptoms': '/mesothelioma.html',
+            'mesothelioma diagnosis': '/mesothelioma.html',
+            'mesothelioma signs': '/mesothelioma.html',
+            'mesothelioma warning signs': '/mesothelioma.html',
+            'mesothelioma early signs': '/mesothelioma.html',
+            'mesothelioma': '/mesothelioma.html',
+            'asbestos exposure': '/mesothelioma.html',
+            'asbestos exposure risks': '/mesothelioma.html',
+            'asbestos related diseases': '/mesothelioma.html',
+            'asbestos': '/mesothelioma.html',
+            'legal options': '/legal-options.html',
+            'legal advice': '/legal-options.html',
+            'injury diagnosis': '/legal-options.html',
+            'compensation options': '/compensation.html',
+            'settlement options': '/compensation.html',
+            'compensation': '/compensation.html',
+            'settlement': '/compensation.html',
+            'caregiver support': '/caregivers.html',
+            'caring for someone': '/caregivers.html',
+            'medical costs': '/cost-of-care.html',
+            'cost of treatment': '/cost-of-care.html',
+            'treatment costs': '/cost-of-care.html',
+            'financial support': '/cost-of-care.html',
+            'ovarian cancer': '/ovarian-cancer.html',
+            'lymphoma': '/lymphoma.html'
+        };
+
+        // Helper function to find and replace article references with links
+        function addArticleLinksToResponse(response) {
+            let processedResponse = response;
+            
+            // Handle various article reference patterns with flexible matching
+            const patterns = [
+                /For more (?:detailed )?information (?:about|on) ([^,.\n]+)/gi,
+                /You can (?:also )?(?:read|learn) (?:more )?about ([^,.\n]+)/gi,
+                /(?:Learn|Read) more about ([^,.\n]+)/gi,
+                /More information (?:about|on) ([^,.\n]+)/gi
+            ];
+            
+            patterns.forEach(pattern => {
+                processedResponse = processedResponse.replace(pattern, (match, articleTopic) => {
+                    const topic = articleTopic.toLowerCase().trim();
+                    
+                    // Find the best matching article URL
+                    for (const [key, url] of Object.entries(ARTICLE_MAPPINGS)) {
+                        if (topic.includes(key.toLowerCase()) || key.toLowerCase().includes(topic)) {
+                            const properLink = `<a href="${url}" target="_blank">${articleTopic.trim()}</a>`;
+                            return match.replace(articleTopic, properLink);
+                        }
+                    }
+                    return match; // Return original if no match found
+                });
+            });
+            
+            // Clean up any malformed HTML that might have been created
+            processedResponse = processedResponse.replace(/([^"]\w+\.html)"?\s*target="?blank"?>/gi, '');
+            
+            // Handle standalone topic mentions (but be more careful to avoid over-matching)
+            const topicPatterns = [
+                'mesothelioma symptoms and diagnosis',
+                'mesothelioma symptoms',
+                'mesothelioma diagnosis',
+                'asbestos exposure risks',
+                'asbestos exposure',
+                'legal options',
+                'compensation options',
+                'medical costs',
+                'ovarian cancer',
+                'lymphoma'
+            ];
+            
+            topicPatterns.forEach(topic => {
+                // Only replace if it's not already part of a link
+                const regex = new RegExp(`(?<!<a[^>]*>)\\b${topic.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b(?![^<]*</a>)`, 'gi');
+                const url = ARTICLE_MAPPINGS[topic.toLowerCase()];
+                if (url) {
+                    processedResponse = processedResponse.replace(regex, `<a href="${url}" target="_blank">${topic}</a>`);
+                }
+            });
+            
+            return processedResponse;
         }
 
         // Typing effect function
@@ -1078,6 +1165,8 @@ IMPORTANT: If the user asks about legal options, filing claims, consulting attor
                 
                 // Add legal referral if needed
                 let aiText = addLegalReferralIfNeeded(data.response);
+                // Add article links to response
+                aiText = addArticleLinksToResponse(aiText);
                 
                 // Add related articles information if found
                 if (relatedArticles.length > 0) {

@@ -877,4 +877,156 @@ export class DataIntegrationService {
     clearCache() {
         this.cache.clear();
     }
+
+    /**
+     * Get LIA Active Cases from Google Sheets
+     */
+    async getLIAActiveCases() {
+        const cacheKey = 'lia_active_cases';
+        const cached = this.getFromCache(cacheKey);
+        if (cached) return cached;
+
+        if (!this.googleSheets) {
+            console.log('⚠️ Google Sheets connector not available for LIA cases');
+            return this.getFallbackLIACases();
+        }
+
+        try {
+            console.log('📊 Fetching LIA Active Cases from Google Sheets...');
+            const { data } = await this.googleSheets.readSheet('Legal Injury Advocates Active cases');
+            
+            if (!data || data.length === 0) {
+                console.log('⚠️ No LIA active cases found in Google Sheets, using fallback');
+                return this.getFallbackLIACases();
+            }
+
+            const activeCases = data
+                .filter(row => {
+                    // Check if case is active (supports various column names)
+                    const active = row.Active || row.Status || row.active || row.status || '';
+                    return active.toString().toLowerCase() === 'true' || 
+                           active.toString().toLowerCase() === 'active' || 
+                           active.toString().toLowerCase() === 'yes' || 
+                           active.toString().toLowerCase() === '1';
+                })
+                .map(row => {
+                    // Parse keywords from the row
+                    const keywordsText = row.Keywords || row.keywords || row['Key Words'] || row['Search Terms'] || '';
+                    const keywords = keywordsText.split(',').map(k => k.trim()).filter(k => k.length > 0);
+                    
+                    return {
+                        caseType: this.createSlug(row['Case Type'] || row.Name || row.name || ''),
+                        name: row['Case Type'] || row.Name || row.name || '',
+                        description: row.Description || row.description || `${row['Case Type'] || row.Name || 'Unknown'} cases`,
+                        keywords: keywords,
+                        active: true,
+                        lastUpdated: row['Last Updated'] || row.lastUpdated || new Date().toISOString(),
+                        source: 'google_sheets'
+                    };
+                });
+
+            // Also include all cases (active and inactive) for admin purposes
+            const allCases = data.map(row => {
+                const active = row.Active || row.Status || row.active || row.status || '';
+                const isActive = active.toString().toLowerCase() === 'true' || 
+                               active.toString().toLowerCase() === 'active' || 
+                               active.toString().toLowerCase() === 'yes' || 
+                               active.toString().toLowerCase() === '1';
+                
+                const keywordsText = row.Keywords || row.keywords || row['Key Words'] || row['Search Terms'] || '';
+                const keywords = keywordsText.split(',').map(k => k.trim()).filter(k => k.length > 0);
+                
+                return {
+                    caseType: this.createSlug(row['Case Type'] || row.Name || row.name || ''),
+                    name: row['Case Type'] || row.Name || row.name || '',
+                    description: row.Description || row.description || `${row['Case Type'] || row.Name || 'Unknown'} cases`,
+                    keywords: keywords,
+                    active: isActive,
+                    lastUpdated: row['Last Updated'] || row.lastUpdated || new Date().toISOString(),
+                    source: 'google_sheets'
+                };
+            });
+
+            const result = {
+                activeCases,
+                allCases,
+                totalActive: activeCases.length,
+                totalCases: allCases.length,
+                lastUpdated: new Date().toISOString(),
+                source: 'google_sheets'
+            };
+
+            console.log(`✅ Fetched ${activeCases.length} active LIA cases out of ${allCases.length} total cases`);
+            this.setCache(cacheKey, result);
+            return result;
+
+        } catch (error) {
+            console.error('❌ Error fetching LIA cases from Google Sheets:', error);
+            console.log('📋 Using fallback LIA cases due to error');
+            return this.getFallbackLIACases();
+        }
+    }
+
+    /**
+     * Check if a query relates to any LIA active case
+     */
+    async checkLIAActiveCase(query) {
+        try {
+            const liaData = await this.getLIAActiveCases();
+            const lowerQuery = query.toLowerCase();
+            
+            for (const caseInfo of liaData.activeCases) {
+                if (caseInfo.keywords.some(keyword => lowerQuery.includes(keyword.toLowerCase()))) {
+                    return {
+                        isActive: true,
+                        caseType: caseInfo.caseType,
+                        name: caseInfo.name,
+                        description: caseInfo.description,
+                        keywords: caseInfo.keywords,
+                        lastUpdated: caseInfo.lastUpdated
+                    };
+                }
+            }
+            
+            return { isActive: false };
+        } catch (error) {
+            console.error('❌ Error checking LIA active case:', error);
+            return { isActive: false, error: error.message };
+        }
+    }
+
+    /**
+     * Fallback LIA cases when Google Sheets is unavailable
+     */
+    getFallbackLIACases() {
+        const fallbackCases = [
+            {
+                caseType: 'mesothelioma',
+                name: 'Mesothelioma',
+                description: 'Mesothelioma and asbestos exposure cases',
+                keywords: ['mesothelioma', 'asbestos', 'asbestos exposure'],
+                active: true,
+                lastUpdated: new Date().toISOString(),
+                source: 'fallback'
+            },
+            {
+                caseType: 'talcum_powder',
+                name: 'Talcum Powder',
+                description: 'Talcum powder ovarian cancer cases',
+                keywords: ['talcum powder', 'talc', 'baby powder', 'ovarian cancer'],
+                active: true,
+                lastUpdated: new Date().toISOString(),
+                source: 'fallback'
+            }
+        ];
+
+        return {
+            activeCases: fallbackCases,
+            allCases: fallbackCases,
+            totalActive: fallbackCases.length,
+            totalCases: fallbackCases.length,
+            lastUpdated: new Date().toISOString(),
+            source: 'fallback'
+        };
+    }
 } 
