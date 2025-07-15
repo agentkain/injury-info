@@ -26,7 +26,7 @@ const dataService = new DataIntegrationService();
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('../'));
+app.use(express.static('../public'));
 
 // API endpoint for OpenAI chat
 app.post('/api/chat', async (req, res) => {
@@ -272,12 +272,12 @@ app.post('/api/lia/check-case', async (req, res) => {
 
 // Serve the main HTML file
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../index.html'));
+  res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
 // Serve individual article pages
 app.get('/article/:slug', (req, res) => {
-  res.sendFile(path.join(__dirname, '../article.html'));
+  res.sendFile(path.join(__dirname, '../public/article.html'));
 });
 
 // Health check
@@ -288,10 +288,10 @@ app.get('/health', (req, res) => {
 // Catch-all handler for other routes
 app.get('*', (req, res) => {
   // Try to serve static files first
-  res.sendFile(path.join(__dirname, '..', req.path), (err) => {
+  res.sendFile(path.join(__dirname, '../public', req.path), (err) => {
     if (err) {
       // If file doesn't exist, serve the main index.html
-      res.sendFile(path.join(__dirname, '../index.html'));
+      res.sendFile(path.join(__dirname, '../public/index.html'));
     }
   });
 });
