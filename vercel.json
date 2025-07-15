@@ -2,18 +2,14 @@
   "version": 2,
   "name": "injury-info-mcp-server",
   "functions": {
-    "server.js": {
+    "api/index.js": {
       "maxDuration": 30
     }
   },
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/server.js"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/server.js"
+      "dest": "/api/index.js"
     }
   ],
   "env": {
