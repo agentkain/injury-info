@@ -27,7 +27,7 @@ const dataService = new DataIntegrationService();
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static('.'));
 
 // API endpoint for OpenAI chat
 app.post('/api/chat', async (req, res) => {
@@ -274,12 +274,12 @@ app.post('/api/lia/check-case', async (req, res) => {
 
 // Serve the main HTML file
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Serve individual article pages
 app.get('/article/:slug', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/article.html'));
+  res.sendFile(path.join(__dirname, 'article.html'));
 });
 
 // Health check
