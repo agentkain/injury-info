@@ -1,0 +1,61 @@
+# AWS Lambda Deployment Package - Required Files
+
+## Core Application Files
+server-lambda.js (rename to server.js)
+data-integration-service.js
+hubspot-connector.js
+google-sheets-connector.js
+server-ai-config.js
+package.json
+package-lock.json
+
+## Web Interface Files
+index.html
+article.html
+mesothelioma.html
+
+## Assets
+Injury-Info-logo-black.svg
+Injury-Info-logo-shield-black.svg
+Injury Info White logo-8.png
+icon-plus.svg
+*.webp (all webp image files)
+
+## Scripts (if needed)
+scripts/
+├── content-generator.js
+├── data-sources-connector.js
+├── hubspot-setup.js
+└── sample-data-templates/
+
+## Configuration Files
+.env.example (for reference)
+
+## Instructions for ZIP Creation:
+1. Select all files above
+2. Create a ZIP file named: legal-platform-deployment.zip
+3. Ensure all files are at the root level of the ZIP (not in folders)
+4. Total size should be under 50MB for Lambda
+
+## Important Notes:
+- Do NOT include node_modules/ folder
+- Do NOT include .env.local (contains sensitive data)
+- Do NOT include .git/ folder
+- Make sure server-lambda.js is renamed to server.js in the ZIP
+
+## File Structure in ZIP:
+legal-platform-deployment.zip
+├── server.js (renamed from server-lambda.js)
+├── data-integration-service.js
+├── hubspot-connector.js
+├── google-sheets-connector.js
+├── server-ai-config.js
+├── package.json
+├── package-lock.json
+├── index.html
+├── article.html
+├── mesothelioma.html
+├── *.svg files
+├── *.png files
+├── *.webp files
+└── scripts/ folder 
